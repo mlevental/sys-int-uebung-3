@@ -1,8 +1,12 @@
+#!/usr/bin/python
+# -*- coding:utf-8 -*-
+
 from bottle import route, run, static_file, template
-import boto
-from boto.s3.key import Key
-from boto.exception import S3ResponseError
+import boto3
+from boto3 import *
 import mb
+
+IMG_NAME = "mb"
 
 
 @route('/ping')
@@ -15,39 +19,30 @@ def generateToS3(bucketname):
     w, h, it = 512, 512, 10
     mb.create_mb(w, h, it)
 
-    s3 = boto.connect_s3()
-    try:
-        bucket = s3.get_bucket(bucketname)
-    except S3ResponseError:
-        return "bucket {bucketname} doesn't exist".format(bucketname=bucketname)
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(bucketname)
 
-    key = Key(bucket)
-    key.key = 'mb'
-    key.set_contents_from_filename('mb.png')
-    key.get_contents_to_filename('mbFromS3.png')
+    if not bucket in s3.buckets.all():
+        bucket.create()
+    bucket.upload_file('mb.png', IMG_NAME)
 
-    return template('index.html', mb='/mbFromS3.png', w=w, h=h, it=it)
+    imgUrl = s3.meta.client.generate_presigned_url('get_object', Params={'Bucket': bucketname, 'Key': IMG_NAME})
+    return template('index.html', w=w, h=h, it=it, imgUrl=imgUrl)
 
 
 @route('/Mandelbrot/deleteFromS3/<bucketname>')
 def deleteFromS3(bucketname):
-    s3 = boto.connect_s3()
+    s3 = boto3.resource('s3')
+    bucket = s3.Bucket(bucketname)
 
-    try:
-        bucket = s3.get_bucket(bucketname)
-    except S3ResponseError:
-        return "bucket {bucketname} doesn't exist".format(bucketname=bucketname)
+    if not bucket in s3.buckets.all():
+        return 'Bucket "{bucketname}" existiert nicht!'.format(bucketname=bucketname)
 
-    for key in bucket.list():
+    for key in bucket.objects.all():
         key.delete()
-
     bucket.delete()
-    return "deleted"
 
-
-@route('/<mb>')
-def show_mb(mb):
-    return static_file(mb, root=".")
+    return "Bucket und alle Objekte gelöscht!"
 
 
 run(host='0.0.0.0', port=8080, debug=True)
