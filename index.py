@@ -6,7 +6,7 @@ import boto3
 from boto3 import *
 import mb
 
-IMG_NAME = "mb"
+IMG_NAME = "mb.png"
 
 
 @route('/ping')
@@ -24,7 +24,7 @@ def generateToS3(bucketname):
 
     if not bucket in s3.buckets.all():
         bucket.create()
-    bucket.upload_file('mb.png', IMG_NAME)
+    bucket.upload_file(IMG_NAME, IMG_NAME)
 
     imgUrl = s3.meta.client.generate_presigned_url('get_object', Params={'Bucket': bucketname, 'Key': IMG_NAME})
     return template('index.html', w=w, h=h, it=it, imgUrl=imgUrl)
